@@ -2,8 +2,8 @@
 
 /**
  * Generate social media shareable images for conference speakers
- * Usage: node scripts/generate-speaker-images.js [event-id]
- * Example: node scripts/generate-speaker-images.js 2026-warsaw-q1
+ * Usage: node scripts/generate-speaker-images.js [event-id] [--discount CODE]
+ * Example: node scripts/generate-speaker-images.js 2026-warsaw-q1 --discount SPEAKER20
  */
 
 import fs from "fs";
@@ -24,10 +24,6 @@ const OUTPUT_DIR = path.join(ROOT_DIR, "dist/speaker-cards");
 const WIDTH = 1200;
 const HEIGHT = 630;
 
-// Brand colors
-const BRAND_GREEN = "#059669"; // Matches the event banner
-const BRAND_WHITE = "#FFFFFF";
-
 /**
  * Parse frontmatter from markdown file
  */
@@ -37,7 +33,6 @@ function parseFrontmatter(content) {
 
   const frontmatter = {};
   const lines = match[1].split("\n");
-  let currentKey = null;
   let inSpeakers = false;
   let currentSpeaker = null;
 
@@ -54,8 +49,6 @@ function parseFrontmatter(content) {
       currentSpeaker.organization = line.replace(/.*organization:/, "").trim().replace(/^"|"$/g, "");
     } else if (inSpeakers && currentSpeaker && line.trim().startsWith("photo:")) {
       currentSpeaker.photo = line.replace(/.*photo:/, "").trim().replace(/^"|"$/g, "");
-    } else if (inSpeakers && currentSpeaker && line.trim().startsWith("linkedin:")) {
-      currentSpeaker.linkedin = line.replace(/.*linkedin:/, "").trim().replace(/^"|"$/g, "");
     }
   }
   if (currentSpeaker) frontmatter.speakers.push(currentSpeaker);
@@ -76,7 +69,7 @@ function escapeXml(str) {
 }
 
 /**
- * Wrap text to fit within a certain width (approximate)
+ * Wrap text to fit within a certain width
  */
 function wrapText(text, maxCharsPerLine) {
   const words = text.split(" ");
@@ -97,61 +90,52 @@ function wrapText(text, maxCharsPerLine) {
 }
 
 /**
- * Create SVG overlay for text content
+ * Create clean SVG overlay - matches LLMDAY brand
  */
-function createTextOverlay(speakerName, talkTitle, organization, eventName, eventDate) {
-  const titleLines = wrapText(talkTitle, 35);
-  const titleY = 320;
-  const lineHeight = 42;
+function createTextOverlay(speakerName, talkTitle, organization, eventName, eventDate, discountCode) {
+  const titleLines = wrapText(talkTitle, 38);
+  const lineHeight = 36;
 
   const titleSvg = titleLines
-    .map((line, i) => `<text x="480" y="${titleY + i * lineHeight}" font-family="Arial, sans-serif" font-size="36" font-weight="bold" fill="${BRAND_WHITE}">${escapeXml(line)}</text>`)
+    .slice(0, 3)
+    .map((line, i) => `<text x="420" y="${340 + i * lineHeight}" font-family="Arial, sans-serif" font-size="28" fill="white">${escapeXml(line)}</text>`)
     .join("\n");
 
-  const speakerNameY = titleY + titleLines.length * lineHeight + 30;
-  const orgY = speakerNameY + 35;
+  const discountSection = discountCode ? `
+    <text x="420" y="560" font-family="Arial, sans-serif" font-size="20" fill="white">Use code: <tspan font-weight="bold">${escapeXml(discountCode)}</tspan></text>
+  ` : "";
 
   return `
     <svg width="${WIDTH}" height="${HEIGHT}" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" style="stop-color:#047857;stop-opacity:1" />
-          <stop offset="100%" style="stop-color:#065f46;stop-opacity:1" />
-        </linearGradient>
-        <clipPath id="circleClip">
-          <circle cx="240" cy="315" r="160"/>
-        </clipPath>
-      </defs>
+      <!-- Green background -->
+      <rect width="${WIDTH}" height="${HEIGHT}" fill="#059669"/>
 
-      <!-- Background -->
-      <rect width="${WIDTH}" height="${HEIGHT}" fill="url(#bgGradient)"/>
+      <!-- LLMDAY branding -->
+      <text x="60" y="70" font-family="Arial, sans-serif" font-size="42" font-weight="bold" fill="white">LLMDAY</text>
+      <text x="245" y="70" font-family="Arial, sans-serif" font-size="42" fill="white">${escapeXml(eventName)}</text>
 
-      <!-- Decorative elements -->
-      <circle cx="1100" cy="100" r="200" fill="rgba(255,255,255,0.05)"/>
-      <circle cx="1150" cy="550" r="150" fill="rgba(255,255,255,0.03)"/>
+      <!-- Tagline -->
+      <text x="60" y="105" font-family="Arial, sans-serif" font-size="20" fill="rgba(255,255,255,0.85)">Large Language Models, AI and ML</text>
 
-      <!-- Top bar with event info -->
-      <rect x="0" y="0" width="${WIDTH}" height="80" fill="rgba(0,0,0,0.2)"/>
-      <text x="40" y="52" font-family="Arial, sans-serif" font-size="32" font-weight="bold" fill="${BRAND_WHITE}">LLMDAY</text>
-      <text x="180" y="52" font-family="Arial, sans-serif" font-size="28" fill="${BRAND_WHITE}">${escapeXml(eventName)}</text>
-      <text x="${WIDTH - 40}" y="52" font-family="Arial, sans-serif" font-size="24" fill="${BRAND_WHITE}" text-anchor="end">${escapeXml(eventDate)}</text>
+      <!-- Date -->
+      <text x="${WIDTH - 60}" y="70" font-family="Arial, sans-serif" font-size="24" fill="white" text-anchor="end">${escapeXml(eventDate)}</text>
 
-      <!-- Speaker photo placeholder circle -->
-      <circle cx="240" cy="355" r="170" fill="rgba(255,255,255,0.1)" stroke="rgba(255,255,255,0.3)" stroke-width="3"/>
+      <!-- Speaker photo circle background -->
+      <circle cx="200" cy="380" r="150" fill="rgba(255,255,255,0.1)"/>
+
+      <!-- Speaker name -->
+      <text x="420" y="220" font-family="Arial, sans-serif" font-size="42" font-weight="bold" fill="white">${escapeXml(speakerName)}</text>
+
+      <!-- Organization -->
+      <text x="420" y="260" font-family="Arial, sans-serif" font-size="22" fill="rgba(255,255,255,0.85)">${escapeXml(organization || "")}</text>
 
       <!-- Talk title -->
       ${titleSvg}
 
-      <!-- Speaker name -->
-      <text x="480" y="${speakerNameY}" font-family="Arial, sans-serif" font-size="28" fill="${BRAND_WHITE}">${escapeXml(speakerName)}</text>
+      ${discountSection}
 
-      <!-- Organization -->
-      <text x="480" y="${orgY}" font-family="Arial, sans-serif" font-size="22" fill="rgba(255,255,255,0.8)">${escapeXml(organization || "")}</text>
-
-      <!-- Bottom bar -->
-      <rect x="0" y="${HEIGHT - 60}" width="${WIDTH}" height="60" fill="rgba(0,0,0,0.2)"/>
-      <text x="40" y="${HEIGHT - 22}" font-family="Arial, sans-serif" font-size="20" fill="rgba(255,255,255,0.9)">llmday.com</text>
-      <text x="${WIDTH - 40}" y="${HEIGHT - 22}" font-family="Arial, sans-serif" font-size="18" fill="rgba(255,255,255,0.7)" text-anchor="end">#LLMDay #AI #MachineLearning</text>
+      <!-- Bottom: website -->
+      <text x="60" y="${HEIGHT - 30}" font-family="Arial, sans-serif" font-size="18" fill="rgba(255,255,255,0.7)">llmday.com</text>
     </svg>
   `;
 }
@@ -159,7 +143,7 @@ function createTextOverlay(speakerName, talkTitle, organization, eventName, even
 /**
  * Generate speaker card image
  */
-async function generateSpeakerCard(speaker, talkTitle, eventId, eventName, eventDate) {
+async function generateSpeakerCard(speaker, talkTitle, eventId, eventName, eventDate, discountCode) {
   const photoPath = path.join(SPEAKERS_DIR, speaker.photo);
 
   if (!fs.existsSync(photoPath)) {
@@ -173,18 +157,19 @@ async function generateSpeakerCard(speaker, talkTitle, eventId, eventName, event
     talkTitle,
     speaker.organization,
     eventName,
-    eventDate
+    eventDate,
+    discountCode
   );
 
-  // Process speaker photo - make it circular
+  // Process speaker photo - circular crop
   const photoBuffer = await sharp(photoPath)
-    .resize(320, 320, { fit: "cover" })
+    .resize(280, 280, { fit: "cover", position: "top" })
     .toBuffer();
 
   // Create circular mask
   const circleMask = Buffer.from(`
-    <svg width="320" height="320">
-      <circle cx="160" cy="160" r="155" fill="white"/>
+    <svg width="280" height="280">
+      <circle cx="140" cy="140" r="140" fill="white"/>
     </svg>
   `);
 
@@ -205,8 +190,8 @@ async function generateSpeakerCard(speaker, talkTitle, eventId, eventName, event
   const finalImage = await sharp(baseImage)
     .composite([{
       input: circularPhoto,
-      left: 80,
-      top: 195
+      left: 60,
+      top: 240
     }])
     .png()
     .toBuffer();
@@ -219,22 +204,46 @@ async function generateSpeakerCard(speaker, talkTitle, eventId, eventName, event
  */
 function getEventInfo(eventId) {
   const eventMap = {
-    "2026-warsaw-q1": { name: "WARSAW 2026 Q1", date: "February 12, 2026" },
-    "2026-london-q2": { name: "LONDON 2026 Q2", date: "Q2 2026" },
-    "2026-nyc-q1": { name: "NYC 2026 Q1", date: "Q1 2026" },
+    "2026-warsaw-q1": { name: "WARSAW", date: "February 12, 2026" },
+    "2026-london-q2": { name: "LONDON", date: "Q2 2026" },
+    "2026-nyc-q1": { name: "NYC", date: "Q1 2026" },
   };
-  return eventMap[eventId] || { name: eventId.toUpperCase(), date: "" };
+  return eventMap[eventId] || { name: eventId.toUpperCase().replace(/-Q\d$/, ""), date: "" };
+}
+
+/**
+ * Parse command line arguments
+ */
+function parseArgs() {
+  const args = process.argv.slice(2);
+  let eventId = "2026-warsaw-q1";
+  let discountCode = null;
+
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === "--discount" && args[i + 1]) {
+      discountCode = args[i + 1];
+      i++;
+    } else if (!args[i].startsWith("--")) {
+      eventId = args[i];
+    }
+  }
+
+  return { eventId, discountCode };
 }
 
 /**
  * Main function
  */
 async function main() {
-  const eventId = process.argv[2] || "2026-warsaw-q1";
+  const { eventId, discountCode } = parseArgs();
   const eventInfo = getEventInfo(eventId);
 
   console.log(`\nGenerating speaker cards for ${eventId}...`);
-  console.log(`Event: ${eventInfo.name} - ${eventInfo.date}\n`);
+  console.log(`Event: LLMDAY ${eventInfo.name} - ${eventInfo.date}`);
+  if (discountCode) {
+    console.log(`Discount code: ${discountCode}`);
+  }
+  console.log("");
 
   const talksDir = path.join(TALKS_DIR, eventId);
 
@@ -286,18 +295,19 @@ async function main() {
           frontmatter.title,
           eventId,
           eventInfo.name,
-          eventInfo.date
+          eventInfo.date,
+          discountCode
         );
 
         if (imageBuffer) {
           fs.writeFileSync(outputPath, imageBuffer);
-          console.log(`    ✓ Saved: ${outputPath}`);
+          console.log(`    Saved: ${outputFilename}`);
           generated++;
         } else {
           skipped++;
         }
       } catch (error) {
-        console.error(`    ✗ Error: ${error.message}`);
+        console.error(`    Error: ${error.message}`);
         skipped++;
       }
     }
@@ -306,7 +316,7 @@ async function main() {
   console.log(`\n========================================`);
   console.log(`Generated: ${generated} images`);
   console.log(`Skipped: ${skipped}`);
-  console.log(`Output directory: ${outputDir}`);
+  console.log(`Output: ${outputDir}`);
   console.log(`========================================\n`);
 }
 
