@@ -88,41 +88,45 @@ function wrapText(text, maxCharsPerLine) {
 }
 
 /**
- * Text overlay - BALANCED LAYOUT (based on Gemini feedback)
- * - Photo vertically centered (y=185)
- * - Header smaller, contextual
- * - Name is HERO (largest)
- * - Title wider (2 lines max)
- * - Footer moved up (no void)
- * - Header/Footer: 24px bold + 20px regular (IDENTICAL, smaller)
+ * Text overlay - CENTERED LAYOUT
+ * - Name vertically centered (HERO)
+ * - Equal top/bottom margins
+ * - LLMDAY in iconic Monoton font style
+ * - Date compact in corner
  */
 function createTextOverlay(speakerName, talkTitle, organization, eventName, eventDate, discountCode) {
   const LEFT_MARGIN = 340;
   // Wider text column (50 chars) to fit title in 2 lines
   const titleLines = wrapText(talkTitle, 50);
 
+  // Parse date for compact format (e.g., "12th February 2026" -> "12 Feb 2026")
+  const compactDate = eventDate.replace(/(\d+)(?:st|nd|rd|th)?\s+(\w{3})\w*\s+(\d{4})/, "$1 $2 $3");
+
   const titleSvg = titleLines
     .slice(0, 2)
-    .map((line, i) => `<text x="${LEFT_MARGIN}" y="${315 + i * 28}" font-family="Arial, sans-serif" font-size="24" fill="${WHITE}">${escapeXml(line)}</text>`)
+    .map((line, i) => `<text x="${LEFT_MARGIN}" y="${355 + i * 28}" font-family="Arial, sans-serif" font-size="24" fill="${WHITE}">${escapeXml(line)}</text>`)
     .join("\n");
 
   return `
     <svg width="${WIDTH}" height="${HEIGHT}" xmlns="http://www.w3.org/2000/svg">
-      <!-- HEADER: Smaller, contextual (24px bold + 20px regular) - nudged down 20px -->
-      <text x="${LEFT_MARGIN}" y="55" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="${WHITE}">LLMDAY ${escapeXml(eventName)}</text>
-      <text x="${LEFT_MARGIN}" y="80" font-family="Arial, sans-serif" font-size="20" fill="${WHITE}">Large Language Models, AI and ML</text>
-      <text x="${LEFT_MARGIN}" y="103" font-family="Arial, sans-serif" font-size="20" fill="${WHITE}">${escapeXml(eventDate)}</text>
+      <!-- TOP LEFT: LLMDAY branding (Monoton-style, or fallback) -->
+      <text x="${LEFT_MARGIN}" y="50" font-family="'Monoton', 'Arial Black', sans-serif" font-size="32" fill="${WHITE}">LLMDAY</text>
+      <text x="${LEFT_MARGIN + 175}" y="50" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="${WHITE}">${escapeXml(eventName)}</text>
+      <text x="${LEFT_MARGIN}" y="78" font-family="Arial, sans-serif" font-size="18" fill="${WHITE}">Large Language Models, AI and ML</text>
 
-      <!-- SPEAKER: HERO - aligned with photo center -->
-      <text x="${LEFT_MARGIN}" y="240" font-family="Arial, sans-serif" font-size="48" font-weight="bold" fill="${WHITE}">${escapeXml(speakerName)}</text>
-      <text x="${LEFT_MARGIN}" y="275" font-family="Arial, sans-serif" font-size="22" fill="${WHITE}">${escapeXml(organization || "")}</text>
+      <!-- TOP RIGHT: Date compact -->
+      <text x="1160" y="50" font-family="Arial, sans-serif" font-size="18" fill="${WHITE}" text-anchor="end">${escapeXml(compactDate)}</text>
 
-      <!-- TALK TITLE: Tighter to org (closed gap) -->
+      <!-- CENTER: SPEAKER NAME (HERO - vertically centered) -->
+      <text x="${LEFT_MARGIN}" y="280" font-family="Arial, sans-serif" font-size="52" font-weight="bold" fill="${WHITE}">${escapeXml(speakerName)}</text>
+      <text x="${LEFT_MARGIN}" y="318" font-family="Arial, sans-serif" font-size="22" fill="${WHITE}">${escapeXml(organization || "")}</text>
+
+      <!-- TALK TITLE: Below speaker -->
       ${titleSvg}
 
-      <!-- FOOTER: Balanced bottom margin (24px bold + 20px regular = SAME AS HEADER) -->
-      <text x="${LEFT_MARGIN}" y="540" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="${WHITE}">Register at llmday.com</text>
-      <text x="${LEFT_MARGIN}" y="568" font-family="Arial, sans-serif" font-size="20" fill="${WHITE}">Use code ${escapeXml(discountCode)} for 30% off</text>
+      <!-- FOOTER: Bottom with equal margin -->
+      <text x="${LEFT_MARGIN}" y="565" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="${WHITE}">Register at llmday.com</text>
+      <text x="${LEFT_MARGIN}" y="593" font-family="Arial, sans-serif" font-size="18" fill="${WHITE}">Use code ${escapeXml(discountCode)} for 30% off</text>
     </svg>
   `;
 }
@@ -195,9 +199,9 @@ async function generateSpeakerCard(speaker, talkTitle, eventId, eventName, event
       .toBuffer()
     );
 
-  // Place photo on left - nudged down 20px for balanced margins
+  // Place photo on left - centered with speaker name (y=280 - 130 = 150)
   baseImage = await sharp(baseImage)
-    .composite([{ input: photoWithBorder, left: 50, top: 205 }])
+    .composite([{ input: photoWithBorder, left: 50, top: 150 }])
     .png()
     .toBuffer();
 
