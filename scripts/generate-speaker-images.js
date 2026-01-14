@@ -2,7 +2,15 @@
 
 /**
  * Generate social media shareable images for conference speakers
- * Uses AI-generated background with speaker photo + text overlay
+ * Clean, simple design with clear hierarchy
+ *
+ * LESSONS APPLIED:
+ * - Only 3 font sizes (20px header/footer, 32px title, 48px name)
+ * - No yellow/amber accents
+ * - Photo background stays as-is (part of design)
+ * - Strict left alignment
+ * - No text over buildings
+ * - Clear REGISTER call to action
  */
 
 import fs from "fs";
@@ -21,6 +29,7 @@ const OUTPUT_DIR = path.join(ROOT_DIR, "dist/speaker-cards");
 
 const WIDTH = 1200;
 const HEIGHT = 630;
+const WHITE = "#FFFFFF";
 
 function parseFrontmatter(content) {
   const match = content.match(/^---\n([\s\S]*?)\n---/);
@@ -79,50 +88,46 @@ function wrapText(text, maxCharsPerLine) {
 }
 
 /**
- * Create text overlay SVG
- * Layout: Branding top-right, speaker info right side, CTA bottom
+ * Text overlay with only 3 font sizes:
+ * - 20px: header and footer
+ * - 32px: talk title
+ * - 48px: speaker name (hero)
  */
 function createTextOverlay(speakerName, talkTitle, organization, eventName, eventDate, discountCode) {
-  const titleLines = wrapText(talkTitle, 32);
-  const lineHeight = 32;
-  const textX = 420; // Right of speaker photo
+  const LEFT_MARGIN = 400;
+  // Shorter lines to avoid overlapping with buildings
+  const titleLines = wrapText(talkTitle, 22);
 
   const titleSvg = titleLines
-    .slice(0, 3)
-    .map((line, i) => `<text x="${textX}" y="${250 + i * lineHeight}" font-family="Arial, sans-serif" font-size="22" font-weight="500" fill="#fbbf24" filter="url(#shadow)">${escapeXml(line)}</text>`)
+    .slice(0, 4)
+    .map((line, i) => `<text x="${LEFT_MARGIN}" y="${280 + i * 38}" font-family="Arial, sans-serif" font-size="28" fill="${WHITE}">${escapeXml(line)}</text>`)
     .join("\n");
 
   return `
     <svg width="${WIDTH}" height="${HEIGHT}" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
-          <feDropShadow dx="1" dy="1" stdDeviation="2" flood-color="#000" flood-opacity="0.5"/>
-        </filter>
-      </defs>
+      <!-- HEADER: Event branding - 20px -->
+      <text x="${LEFT_MARGIN}" y="60" font-family="Arial, sans-serif" font-size="20" fill="${WHITE}">LLMDAY ${escapeXml(eventName)} | ${escapeXml(eventDate)}</text>
 
-      <!-- Top right: Event branding -->
-      <text x="${WIDTH - 40}" y="45" font-family="Arial, sans-serif" font-size="28" font-weight="bold" fill="white" text-anchor="end" filter="url(#shadow)" letter-spacing="3">LLMDAY ${escapeXml(eventName)}</text>
-      <text x="${WIDTH - 40}" y="72" font-family="Arial, sans-serif" font-size="16" fill="rgba(255,255,255,0.9)" text-anchor="end" filter="url(#shadow)">${escapeXml(eventDate)}</text>
+      <!-- HERO: Speaker name - 44px -->
+      <text x="${LEFT_MARGIN}" y="150" font-family="Arial, sans-serif" font-size="44" font-weight="bold" fill="${WHITE}">${escapeXml(speakerName)}</text>
 
-      <!-- Right side: Speaker info (in the sky area) -->
-      <text x="${textX}" y="170" font-family="Arial, sans-serif" font-size="44" font-weight="bold" fill="white" filter="url(#shadow)">${escapeXml(speakerName)}</text>
-      <text x="${textX}" y="205" font-family="Arial, sans-serif" font-size="20" fill="rgba(255,255,255,0.9)" filter="url(#shadow)">${escapeXml(organization || "")}</text>
+      <!-- Organization - 20px (same as header) -->
+      <text x="${LEFT_MARGIN}" y="185" font-family="Arial, sans-serif" font-size="20" fill="${WHITE}" opacity="0.9">${escapeXml(organization || "")}</text>
 
-      <!-- Talk title in gold -->
+      <!-- BODY: Talk title - 28px, tighter -->
       ${titleSvg}
 
-      <!-- Bottom: CTA with semi-transparent background -->
-      <rect x="${textX - 15}" y="${HEIGHT - 70}" width="600" height="45" rx="6" fill="rgba(0,0,0,0.6)"/>
-      <text x="${textX}" y="${HEIGHT - 40}" font-family="Arial, sans-serif" font-size="18" fill="white">Save 30% with code <tspan font-weight="bold" fill="#fbbf24">${escapeXml(discountCode)}</tspan> at <tspan font-weight="bold">llmday.com</tspan></text>
+      <!-- FOOTER: Clear CTA - positioned ABOVE buildings -->
+      <text x="${LEFT_MARGIN}" y="470" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="${WHITE}">REGISTER at llmday.com | Code ${escapeXml(discountCode)} for 30% off</text>
     </svg>
   `;
 }
 
 /**
- * Generate speaker card
+ * Generate speaker card - simple and clean
  */
 async function generateSpeakerCard(speaker, talkTitle, eventId, eventName, eventDate, discountCode) {
-  const bgPath = path.join(ASSETS_DIR, "speaker-bg.png");
+  const bgPath = path.join(ASSETS_DIR, "speaker-card-bg.png");
   const photoPath = path.join(SPEAKERS_DIR, speaker.photo);
 
   if (!fs.existsSync(bgPath)) {
@@ -135,20 +140,23 @@ async function generateSpeakerCard(speaker, talkTitle, eventId, eventName, event
     return null;
   }
 
-  // 1. Start with AI-generated background, resize to target dimensions
+  // 1. Background
   let baseImage = await sharp(bgPath)
     .resize(WIDTH, HEIGHT, { fit: "cover", position: "center" })
     .png()
     .toBuffer();
 
-  // 2. Create circular speaker photo
-  const photoSize = 320;
+  // 2. Speaker photo - simple circle with white border, keep original background
+  const photoSize = 260;
+  const borderSize = 4;
+  const totalSize = photoSize + borderSize * 2;
+
   const photoBuffer = await sharp(photoPath)
     .resize(photoSize, photoSize, { fit: "cover", position: "top" })
     .png()
     .toBuffer();
 
-  // Create circular mask
+  // Circle mask
   const circleMask = Buffer.from(`
     <svg width="${photoSize}" height="${photoSize}">
       <circle cx="${photoSize/2}" cy="${photoSize/2}" r="${photoSize/2}" fill="white"/>
@@ -163,44 +171,33 @@ async function generateSpeakerCard(speaker, talkTitle, eventId, eventName, event
     .png()
     .toBuffer();
 
-  // 3. Add subtle glow/border around photo
-  const glowSize = photoSize + 20;
-  const photoWithGlow = await sharp({
-    create: {
-      width: glowSize,
-      height: glowSize,
-      channels: 4,
-      background: { r: 0, g: 0, b: 0, alpha: 0 }
-    }
-  })
-    .composite([
-      // Gold glow circle behind
-      {
-        input: Buffer.from(`
-          <svg width="${glowSize}" height="${glowSize}">
-            <circle cx="${glowSize/2}" cy="${glowSize/2}" r="${glowSize/2}" fill="rgba(251,191,36,0.3)"/>
-          </svg>
-        `),
-        left: 0,
-        top: 0
-      },
-      // The actual photo
-      {
+  // White border circle
+  const borderCircle = Buffer.from(`
+    <svg width="${totalSize}" height="${totalSize}">
+      <circle cx="${totalSize/2}" cy="${totalSize/2}" r="${totalSize/2}" fill="white"/>
+    </svg>
+  `);
+
+  const photoWithBorder = await sharp(Buffer.from(borderCircle))
+    .png()
+    .toBuffer()
+    .then(bg => sharp(bg)
+      .composite([{
         input: circularPhoto,
-        left: 10,
-        top: 10
-      }
-    ])
-    .png()
-    .toBuffer();
+        left: borderSize,
+        top: borderSize
+      }])
+      .png()
+      .toBuffer()
+    );
 
-  // 4. Composite photo onto background (left side, mid-height)
+  // Place photo on left - aligned vertically with text
   baseImage = await sharp(baseImage)
-    .composite([{ input: photoWithGlow, left: 40, top: (HEIGHT - glowSize) / 2 - 30 }])
+    .composite([{ input: photoWithBorder, left: 60, top: 160 }])
     .png()
     .toBuffer();
 
-  // 5. Create and composite text overlay
+  // 3. Text overlay
   const textOverlay = createTextOverlay(speaker.name, talkTitle, speaker.organization, eventName, eventDate, discountCode);
   const textBuffer = await sharp(Buffer.from(textOverlay)).png().toBuffer();
 
