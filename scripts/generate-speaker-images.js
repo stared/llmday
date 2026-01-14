@@ -88,37 +88,41 @@ function wrapText(text, maxCharsPerLine) {
 }
 
 /**
- * Text overlay with only 3 font sizes:
- * - 20px: header and footer
- * - 32px: talk title
- * - 48px: speaker name (hero)
+ * Text overlay - BALANCED LAYOUT (based on Gemini feedback)
+ * - Photo vertically centered (y=185)
+ * - Header smaller, contextual
+ * - Name is HERO (largest)
+ * - Title wider (2 lines max)
+ * - Footer moved up (no void)
+ * - Header/Footer: 24px bold + 20px regular (IDENTICAL, smaller)
  */
 function createTextOverlay(speakerName, talkTitle, organization, eventName, eventDate, discountCode) {
-  const LEFT_MARGIN = 400;
-  // Shorter lines to avoid overlapping with buildings
-  const titleLines = wrapText(talkTitle, 22);
+  const LEFT_MARGIN = 340;
+  // Wider text column (50 chars) to fit title in 2 lines
+  const titleLines = wrapText(talkTitle, 50);
 
   const titleSvg = titleLines
-    .slice(0, 4)
-    .map((line, i) => `<text x="${LEFT_MARGIN}" y="${280 + i * 38}" font-family="Arial, sans-serif" font-size="28" fill="${WHITE}">${escapeXml(line)}</text>`)
+    .slice(0, 2)
+    .map((line, i) => `<text x="${LEFT_MARGIN}" y="${315 + i * 28}" font-family="Arial, sans-serif" font-size="24" fill="${WHITE}">${escapeXml(line)}</text>`)
     .join("\n");
 
   return `
     <svg width="${WIDTH}" height="${HEIGHT}" xmlns="http://www.w3.org/2000/svg">
-      <!-- HEADER: Event branding - 20px -->
-      <text x="${LEFT_MARGIN}" y="60" font-family="Arial, sans-serif" font-size="20" fill="${WHITE}">LLMDAY ${escapeXml(eventName)} | ${escapeXml(eventDate)}</text>
+      <!-- HEADER: Smaller, contextual (24px bold + 20px regular) - nudged down 20px -->
+      <text x="${LEFT_MARGIN}" y="55" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="${WHITE}">LLMDAY ${escapeXml(eventName)}</text>
+      <text x="${LEFT_MARGIN}" y="80" font-family="Arial, sans-serif" font-size="20" fill="${WHITE}">Large Language Models, AI and ML</text>
+      <text x="${LEFT_MARGIN}" y="103" font-family="Arial, sans-serif" font-size="20" fill="${WHITE}">${escapeXml(eventDate)}</text>
 
-      <!-- HERO: Speaker name - 44px -->
-      <text x="${LEFT_MARGIN}" y="150" font-family="Arial, sans-serif" font-size="44" font-weight="bold" fill="${WHITE}">${escapeXml(speakerName)}</text>
+      <!-- SPEAKER: HERO - aligned with photo center -->
+      <text x="${LEFT_MARGIN}" y="240" font-family="Arial, sans-serif" font-size="48" font-weight="bold" fill="${WHITE}">${escapeXml(speakerName)}</text>
+      <text x="${LEFT_MARGIN}" y="275" font-family="Arial, sans-serif" font-size="22" fill="${WHITE}">${escapeXml(organization || "")}</text>
 
-      <!-- Organization - 20px (same as header) -->
-      <text x="${LEFT_MARGIN}" y="185" font-family="Arial, sans-serif" font-size="20" fill="${WHITE}" opacity="0.9">${escapeXml(organization || "")}</text>
-
-      <!-- BODY: Talk title - 28px, tighter -->
+      <!-- TALK TITLE: Tighter to org (closed gap) -->
       ${titleSvg}
 
-      <!-- FOOTER: Clear CTA - positioned ABOVE buildings -->
-      <text x="${LEFT_MARGIN}" y="470" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="${WHITE}">REGISTER at llmday.com | Code ${escapeXml(discountCode)} for 30% off</text>
+      <!-- FOOTER: Balanced bottom margin (24px bold + 20px regular = SAME AS HEADER) -->
+      <text x="${LEFT_MARGIN}" y="540" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="${WHITE}">Register at llmday.com</text>
+      <text x="${LEFT_MARGIN}" y="568" font-family="Arial, sans-serif" font-size="20" fill="${WHITE}">Use code ${escapeXml(discountCode)} for 30% off</text>
     </svg>
   `;
 }
@@ -191,9 +195,9 @@ async function generateSpeakerCard(speaker, talkTitle, eventId, eventName, event
       .toBuffer()
     );
 
-  // Place photo on left - aligned vertically with text
+  // Place photo on left - nudged down 20px for balanced margins
   baseImage = await sharp(baseImage)
-    .composite([{ input: photoWithBorder, left: 60, top: 160 }])
+    .composite([{ input: photoWithBorder, left: 50, top: 205 }])
     .png()
     .toBuffer();
 
@@ -211,7 +215,7 @@ async function generateSpeakerCard(speaker, talkTitle, eventId, eventName, event
 
 function getEventInfo(eventId) {
   const eventMap = {
-    "2026-warsaw-q1": { name: "WARSAW", date: "February 12, 2026" },
+    "2026-warsaw-q1": { name: "WARSAW", date: "12th February 2026" },
     "2026-london-q2": { name: "LONDON", date: "Q2 2026" },
     "2026-nyc-q1": { name: "NYC", date: "Q1 2026" },
   };
